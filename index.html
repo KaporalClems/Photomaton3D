@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photomaton Studio Pro - Éditeur 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        .preview-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 16/9;
+            background: #000;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            touch-action: none;
+        }
+        #videoFeed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        /* Effet miroir dynamique */
+        .mirror {
+            transform: scaleX(-1);
+        }
+        /* Conteneur 3D */
+        #threeCanvasContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+        /* Éléments manipulables */
+        .draggable-element {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+            z-index: 10;
+            border: 2px dashed transparent;
+        }
+        .draggable-element.active {
+            border-color: #3b82f6;
+        }
+        #templateWrapper { top: 10%; left: 10%; width: 40%; }
+        
+        /* Poignées */
+        .resize-handle {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            background: #3b82f6;
+            border: 3px solid white;
+            border-radius: 50%;
+            bottom: -14px;
+            right: -14px;
+            cursor: nwse-resize;
+            display: none;
+        }
+        .active .resize-handle { display: block; }
+
+        .flash {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: white; opacity: 0; pointer-events: none; z-index: 100;
+        }
+        @keyframes flash-anim { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+        .animate-flash { animation: flash-anim 0.4s ease-out; }
+        
+        #errorOverlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.8);
+            display: none; flex-direction: column; align-items: center;
+            justify-content: center; padding: 20px; text-align: center; z-index: 50;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center p-2 sm:p-4 font-sans">
+
+    <header class="text-center mb-4 sm:mb-6">
+        <h1 class="text-3xl sm:text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-orange-500 to-red-600">
+            STUDIO 3D MOBILE
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-400">Designez votre souvenir partout.</p>
+    </header>
+
+    <main class="w-full max-w-6xl grid grid-cols-1 xl:grid-cols-4 gap-4 sm:gap-6">
+        
+        <div class="xl:col-span-3 flex flex-col items-center">
+            <div class="preview-container border border-slate-800" id="editorZone">
+                <video id="videoFeed" autoplay playsinline muted class="mirror"></video>
+                
+                <!-- Calque Three.js pour le texte 3D -->
+                <div id="threeCanvasContainer"></div>
+
+                <div id="errorOverlay">
+                    <p class="text-white font-bold mb-2 text-sm sm:text-base">Erreur Caméra</p>
+                    <button onclick="initCam()" class="bg-slate-700 px-4 py-2 rounded-lg text-xs">Réessayer</button>
+                </div>
+
+                <!-- Bouton Switch Caméra -->
+                <button id="btnSwitchCam" class="absolute top-4 right-4 z-20 bg-black/50 p-3 rounded-full border border-white/20 hover:bg-black/80 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </button>
+
+                <!-- Cadre manipulable -->
+                <div id="templateWrapper" class="draggable-element hidden">
+                    <img id="templateOverlay" src="" alt="" class="w-full pointer-events-none">
+                    <div class="resize-handle" id="resizeHandle"></div>
+                </div>
+
+                <div id="flashOverlay" class="flash"></div>
+                <div id="countdown" class="absolute inset-0 flex items-center justify-center text-8xl sm:text-9xl font-black text-white drop-shadow-2xl hidden z-[100]"></div>
+            </div>
+
+            <div class="mt-4 sm:mt-6 w-full flex flex-col sm:flex-row gap-4 items-center justify-center">
+                <button id="btnCapture" class="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-8 sm:px-12 py-3 sm:py-4 rounded-2xl font-bold text-lg sm:text-xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3">
+                    📸 PRENDRE LA PHOTO
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-800 shadow-2xl space-y-4 sm:space-y-6">
+            <div>
+                <h2 class="text-base sm:text-lg font-bold mb-3 flex items-center gap-2">
+                    <span class="w-2 h-6 bg-yellow-500 rounded-full"></span>
+                    Export
+                </h2>
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-2">Nom du projet</label>
+                    <input type="text" id="fileNameInput" placeholder="anniversaire" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-yellow-500">
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-base sm:text-lg font-bold mb-3 flex items-center gap-2">
+                    <span class="w-2 h-6 bg-blue-500 rounded-full"></span>
+                    Personnalisation
+                </h2>
+                <div class="flex flex-col gap-3">
+                    <label class="flex items-center gap-2 text-xs sm:text-sm cursor-pointer bg-slate-800 p-3 rounded-xl">
+                        <input type="checkbox" id="toggle3D" checked class="w-4 h-4">
+                        Titre 3D Actif
+                    </label>
+                    
+                    <label class="block group cursor-pointer">
+                        <div class="border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-2xl p-3 sm:p-4 text-center transition-all bg-slate-950/50">
+                            <span class="text-xs font-medium text-slate-400">Changer Cadre (PNG)</span>
+                            <input type="file" id="uploadTemplate" accept="image/*" class="hidden">
+                        </div>
+                    </label>
+
+                    <button id="btnClearCache" class="text-[10px] text-slate-500 hover:text-red-400 transition-colors uppercase font-bold text-left px-1">
+                        Effacer les paramètres mémorisés
+                    </button>
+                </div>
+            </div>
+
+            <div id="resultArea" class="pt-4 border-t border-slate-800 hidden">
+                <h2 class="text-base sm:text-lg font-bold mb-3 text-yellow-400">Capture</h2>
+                <div id="gallery"></div>
+            </div>
+        </div>
+    </main>
+
+    <canvas id="canvasProcess" class="hidden"></canvas>
+
+    <script>
+        const video = document.getElementById('videoFeed');
+        const templateWrapper = document.getElementById('templateWrapper');
+        const templateOverlay = document.getElementById('templateOverlay');
+        const btnCapture = document.getElementById('btnCapture');
+        const btnSwitchCam = document.getElementById('btnSwitchCam');
+        const uploadTemplate = document.getElementById('uploadTemplate');
+        const canvas = document.getElementById('canvasProcess');
+        const flashOverlay = document.getElementById('flashOverlay');
+        const countdownEl = document.getElementById('countdown');
+        const gallery = document.getElementById('gallery');
+        const editorZone = document.getElementById('editorZone');
+        const fileNameInput = document.getElementById('fileNameInput');
+        const toggle3D = document.getElementById('toggle3D');
+        const btnClearCache = document.getElementById('btnClearCache');
+
+        let scene, camera, renderer, textMesh;
+        let isDragging = false, isResizing = false;
+        let startX, startY, startW, startLeft, startTop;
+        let currentFacingMode = 'user'; // 'user' ou 'environment'
+
+        // --- GESTION DU CACHE (LocalStorage) ---
+        const CACHE_KEYS = {
+            FILENAME: 'photomaton_filename',
+            TOGGLE3D: 'photomaton_3d_enabled',
+            TEMPLATE_IMAGE: 'photomaton_template_src',
+            TEMPLATE_POS: 'photomaton_template_pos'
+        };
+
+        function saveSettings() {
+            localStorage.setItem(CACHE_KEYS.FILENAME, fileNameInput.value);
+            localStorage.setItem(CACHE_KEYS.TOGGLE3D, toggle3D.checked);
+            
+            // On sauvegarde aussi la position du cadre si visible
+            if (!templateWrapper.classList.contains('hidden')) {
+                const pos = {
+                    top: templateWrapper.style.top,
+                    left: templateWrapper.style.left,
+                    width: templateWrapper.style.width
+                };
+                localStorage.setItem(CACHE_KEYS.TEMPLATE_POS, JSON.stringify(pos));
+            }
+        }
+
+        function loadSettings() {
+            const cachedName = localStorage.getItem(CACHE_KEYS.FILENAME);
+            if (cachedName !== null) fileNameInput.value = cachedName;
+
+            const cached3D = localStorage.getItem(CACHE_KEYS.TOGGLE3D);
+            if (cached3D !== null) toggle3D.checked = (cached3D === 'true');
+
+            const cachedImg = localStorage.getItem(CACHE_KEYS.TEMPLATE_IMAGE);
+            if (cachedImg) {
+                templateOverlay.src = cachedImg;
+                templateWrapper.classList.remove('hidden');
+                
+                const cachedPos = localStorage.getItem(CACHE_KEYS.TEMPLATE_POS);
+                if (cachedPos) {
+                    const pos = JSON.parse(cachedPos);
+                    templateWrapper.style.top = pos.top;
+                    templateWrapper.style.left = pos.left;
+                    templateWrapper.style.width = pos.width;
+                }
+            }
+        }
+
+        btnClearCache.addEventListener('click', () => {
+            if(confirm("Effacer tous les paramètres sauvegardés ?")) {
+                localStorage.clear();
+                window.location.reload();
+            }
+        });
+
+        // --- Configuration THREE.JS ---
+        function init3D() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, editorZone.clientWidth / editorZone.clientHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(editorZone.clientWidth, editorZone.clientHeight);
+            document.getElementById('threeCanvasContainer').appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            const pointLight = new THREE.PointLight(0xffd700, 1.5);
+            pointLight.position.set(10, 10, 10);
+            scene.add(pointLight);
+
+            const loader = new THREE.FontLoader();
+            loader.load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', function (font) {
+                const textGeo = new THREE.TextGeometry('JOYEUX\nANNIVERSAIRE', {
+                    font: font,
+                    size: 0.5,
+                    height: 0.2,
+                    curveSegments: 12,
+                    bevelEnabled: true,
+                    bevelThickness: 0.03,
+                    bevelSize: 0.02
+                });
+                textGeo.center();
+                const material = new THREE.MeshPhongMaterial({ color: 0xffcc00, specular: 0xffffff, shininess: 100 });
+                textMesh = new THREE.Mesh(textGeo, material);
+                textMesh.position.y = 1;
+                scene.add(textMesh);
+            });
+
+            camera.position.z = 5;
+            animate3D();
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            if (textMesh) {
+                textMesh.rotation.y = Math.sin(Date.now() * 0.002) * 0.2;
+                textMesh.position.y = 1 + Math.sin(Date.now() * 0.003) * 0.1;
+            }
+            renderer.render(scene, camera);
+        }
+
+        // --- Init Caméra avec Switch ---
+        async function initCam() {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+
+            if (currentFacingMode === 'user') {
+                video.classList.add('mirror');
+            } else {
+                video.classList.remove('mirror');
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: currentFacingMode,
+                        width: { ideal: 1280 }, 
+                        height: { ideal: 720 } 
+                    } 
+                });
+                video.srcObject = stream;
+            } catch (e) { 
+                document.getElementById('errorOverlay').style.display = 'flex'; 
+            }
+        }
+
+        btnSwitchCam.addEventListener('click', () => {
+            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            initCam();
+        });
+
+        // --- Interactions (Drag & Resize) ---
+        function handleStart(e) {
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            if (e.target.id === 'resizeHandle') { 
+                isResizing = true; 
+            } else { 
+                isDragging = true; 
+            }
+            startX = clientX; startY = clientY;
+            startLeft = templateWrapper.offsetLeft; startTop = templateWrapper.offsetTop;
+            startW = templateWrapper.offsetWidth;
+            templateWrapper.classList.add('active');
+        }
+
+        function handleMove(e) {
+            if (!isDragging && !isResizing) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            if (isDragging) {
+                templateWrapper.style.left = (startLeft + (clientX - startX)) + 'px';
+                templateWrapper.style.top = (startTop + (clientY - startY)) + 'px';
+            }
+            if (isResizing) {
+                templateWrapper.style.width = Math.max(50, startW + (clientX - startX)) + 'px';
+            }
+            saveSettings(); // Sauvegarde position temps réel
+            e.preventDefault();
+        }
+
+        templateWrapper.addEventListener('mousedown', handleStart);
+        templateWrapper.addEventListener('touchstart', handleStart);
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('touchmove', handleMove, { passive: false });
+        window.addEventListener('mouseup', () => { isDragging = false; isResizing = false; saveSettings(); });
+        window.addEventListener('touchend', () => { isDragging = false; isResizing = false; saveSettings(); });
+
+        // --- Upload ---
+        uploadTemplate.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (f) => {
+                    const dataUrl = f.target.result;
+                    templateOverlay.src = dataUrl;
+                    templateWrapper.classList.remove('hidden');
+                    
+                    // On essaie de sauvegarder l'image en cache
+                    try {
+                        localStorage.setItem(CACHE_KEYS.TEMPLATE_IMAGE, dataUrl);
+                    } catch (err) {
+                        console.warn("L'image est trop lourde pour le cache du navigateur.");
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // --- Listeners pour auto-save ---
+        fileNameInput.addEventListener('input', saveSettings);
+        toggle3D.addEventListener('change', saveSettings);
+
+        // --- Capture ---
+        btnCapture.addEventListener('click', () => {
+            let count = 3;
+            countdownEl.classList.remove('hidden');
+            const timer = setInterval(() => {
+                countdownEl.textContent = count;
+                if (count <= 0) {
+                    clearInterval(timer);
+                    countdownEl.classList.add('hidden');
+                    capturePhoto();
+                }
+                count--;
+            }, 800);
+        });
+
+        function capturePhoto() {
+            flashOverlay.classList.add('animate-flash');
+            setTimeout(() => flashOverlay.classList.remove('animate-flash'), 400);
+
+            const vW = video.videoWidth;
+            const vH = video.videoHeight;
+            canvas.width = vW;
+            canvas.height = vH;
+            const ctx = canvas.getContext('2d');
+
+            ctx.save();
+            if (currentFacingMode === 'user') {
+                ctx.translate(vW, 0); ctx.scale(-1, 1);
+            }
+            ctx.drawImage(video, 0, 0, vW, vH);
+            ctx.restore();
+
+            if (toggle3D.checked) {
+                renderer.render(scene, camera);
+                ctx.drawImage(renderer.domElement, 0, 0, vW, vH);
+            }
+
+            if (!templateWrapper.classList.contains('hidden')) {
+                const editorRect = editorZone.getBoundingClientRect();
+                const wrapperRect = templateWrapper.getBoundingClientRect();
+                const sX = vW / editorRect.width;
+                const sY = vH / editorRect.height;
+                ctx.drawImage(templateOverlay, 
+                    (wrapperRect.left - editorRect.left) * sX, 
+                    (wrapperRect.top - editorRect.top) * sY, 
+                    wrapperRect.width * sX, 
+                    wrapperRect.height * sY
+                );
+            }
+
+            const now = new Date();
+            const dateStr = `${String(now.getDate()).padStart(2,'0')}${String(now.getMonth()+1).padStart(2,'0')}${now.getFullYear()}`;
+            const prefix = fileNameInput.value.trim().replace(/[^a-z0-9]/gi, '_') || 'capture';
+            const fileName = `${prefix}_${dateStr}.png`;
+
+            const url = canvas.toDataURL('image/png');
+            document.getElementById('resultArea').classList.remove('hidden');
+            gallery.innerHTML = `
+                <div class="space-y-3">
+                    <img src="${url}" class="w-full rounded-xl shadow-2xl border border-slate-700">
+                    <a href="${url}" download="${fileName}" class="block w-full text-center bg-yellow-500 text-black font-black py-3 rounded-xl">TÉLÉCHARGER</a>
+                    <p class="text-[10px] text-center text-slate-500 italic">${fileName}</p>
+                </div>
+            `;
+        }
+
+        window.onload = () => {
+            initCam();
+            init3D();
+            loadSettings(); // Restaurer les paramètres au chargement
+        };
+
+        window.addEventListener('resize', () => {
+            if (renderer && camera && editorZone) {
+                const w = editorZone.clientWidth;
+                const h = editorZone.clientHeight;
+                renderer.setSize(w, h);
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+            }
+        });
+    </script>
+</body>
+</html>
