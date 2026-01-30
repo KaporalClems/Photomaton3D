@@ -23,21 +23,18 @@
             height: 100%;
             object-fit: cover;
         }
-        /* Effet miroir dynamique */
         .mirror {
             transform: scaleX(-1);
         }
-        /* Conteneur 3D */
         #threeCanvasContainer {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none;
+            pointer-events: auto; /* Permettre les interactions sur le canvas 3D */
             z-index: 5;
         }
-        /* Éléments manipulables */
         .draggable-element {
             position: absolute;
             cursor: move;
@@ -48,18 +45,17 @@
         .draggable-element.active {
             border-color: #3b82f6;
         }
-        #templateWrapper { top: 10%; left: 10%; width: 40%; }
+        #templateWrapper { top: 10%; left: 10%; width: 30%; }
         
-        /* Poignées */
         .resize-handle {
             position: absolute;
-            width: 28px;
-            height: 28px;
+            width: 24px;
+            height: 24px;
             background: #3b82f6;
             border: 3px solid white;
             border-radius: 50%;
-            bottom: -14px;
-            right: -14px;
+            bottom: -12px;
+            right: -12px;
             cursor: nwse-resize;
             display: none;
         }
@@ -86,7 +82,7 @@
         <h1 class="text-3xl sm:text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-orange-500 to-red-600">
             STUDIO 3D MOBILE
         </h1>
-        <p class="text-xs sm:text-sm text-slate-400">Designez votre souvenir partout.</p>
+        <p class="text-xs sm:text-sm text-slate-400">Créez votre design interactif en temps réel.</p>
     </header>
 
     <main class="w-full max-w-6xl grid grid-cols-1 xl:grid-cols-4 gap-4 sm:gap-6">
@@ -95,7 +91,7 @@
             <div class="preview-container border border-slate-800" id="editorZone">
                 <video id="videoFeed" autoplay playsinline muted class="mirror"></video>
                 
-                <!-- Calque Three.js pour le texte 3D -->
+                <!-- Zone Three.js -->
                 <div id="threeCanvasContainer"></div>
 
                 <div id="errorOverlay">
@@ -110,7 +106,7 @@
                     </svg>
                 </button>
 
-                <!-- Cadre manipulable -->
+                <!-- Cadre image manipulable -->
                 <div id="templateWrapper" class="draggable-element hidden">
                     <img id="templateOverlay" src="" alt="" class="w-full pointer-events-none">
                     <div class="resize-handle" id="resizeHandle"></div>
@@ -120,51 +116,78 @@
                 <div id="countdown" class="absolute inset-0 flex items-center justify-center text-8xl sm:text-9xl font-black text-white drop-shadow-2xl hidden z-[100]"></div>
             </div>
 
-            <div class="mt-4 sm:mt-6 w-full flex flex-col sm:flex-row gap-4 items-center justify-center">
+            <div class="mt-4 sm:mt-6 w-full flex flex-col sm:row gap-4 items-center justify-center">
                 <button id="btnCapture" class="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-8 sm:px-12 py-3 sm:py-4 rounded-2xl font-bold text-lg sm:text-xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3">
                     📸 PRENDRE LA PHOTO
                 </button>
             </div>
         </div>
 
-        <div class="bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-800 shadow-2xl space-y-4 sm:space-y-6">
+        <!-- Panneau latéral -->
+        <div class="bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-800 shadow-2xl space-y-6 overflow-y-auto max-h-[80vh] xl:max-h-none">
+            
+            <!-- EXPORT -->
             <div>
                 <h2 class="text-base sm:text-lg font-bold mb-3 flex items-center gap-2">
                     <span class="w-2 h-6 bg-yellow-500 rounded-full"></span>
-                    Export
+                    Projet
                 </h2>
-                <div class="mb-4">
-                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-2">Nom du projet</label>
-                    <input type="text" id="fileNameInput" placeholder="anniversaire" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-yellow-500">
+                <input type="text" id="fileNameInput" placeholder="Nom du fichier" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-yellow-500">
+            </div>
+
+            <!-- PERSONNALISATION TEXTE 3D -->
+            <div>
+                <h2 class="text-base sm:text-lg font-bold mb-3 flex items-center gap-2 text-blue-400">
+                    <span class="w-2 h-6 bg-blue-500 rounded-full"></span>
+                    Texte 3D
+                </h2>
+                <div class="space-y-3">
+                    <label class="flex items-center gap-2 text-xs sm:text-sm cursor-pointer bg-slate-800 p-3 rounded-xl">
+                        <input type="checkbox" id="toggle3D" checked class="w-4 h-4">
+                        Afficher le texte
+                    </label>
+                    
+                    <div class="space-y-1">
+                        <span class="text-[10px] text-slate-500 font-bold uppercase">Message</span>
+                        <textarea id="text3DInput" rows="2" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500" placeholder="JOYEUX ANNIVERSAIRE"></textarea>
+                    </div>
+
+                    <div class="space-y-1">
+                        <span class="text-[10px] text-slate-500 font-bold uppercase">Police</span>
+                        <select id="fontSelect" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500">
+                            <option value="helvetiker_bold">Moderne (Helvetica)</option>
+                            <option value="gentilis_bold">Élégante (Gentilis)</option>
+                            <option value="optimer_bold">Technique (Optimer)</option>
+                        </select>
+                    </div>
+
+                    <p class="text-[10px] text-slate-400 italic">Astuce: Cliquez/Glissez sur le texte 3D pour le déplacer.</p>
                 </div>
             </div>
 
+            <!-- CADRE PNG -->
             <div>
-                <h2 class="text-base sm:text-lg font-bold mb-3 flex items-center gap-2">
-                    <span class="w-2 h-6 bg-blue-500 rounded-full"></span>
-                    Personnalisation
+                <h2 class="text-base sm:text-lg font-bold mb-3 flex items-center gap-2 text-orange-400">
+                    <span class="w-2 h-6 bg-orange-500 rounded-full"></span>
+                    Cadre / Logo
                 </h2>
-                <div class="flex flex-col gap-3">
-                    <label class="flex items-center gap-2 text-xs sm:text-sm cursor-pointer bg-slate-800 p-3 rounded-xl">
-                        <input type="checkbox" id="toggle3D" checked class="w-4 h-4">
-                        Titre 3D Actif
-                    </label>
-                    
-                    <label class="block group cursor-pointer">
-                        <div class="border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-2xl p-3 sm:p-4 text-center transition-all bg-slate-950/50">
-                            <span class="text-xs font-medium text-slate-400">Changer Cadre (PNG)</span>
-                            <input type="file" id="uploadTemplate" accept="image/*" class="hidden">
-                        </div>
-                    </label>
+                <label class="block group cursor-pointer">
+                    <div class="border-2 border-dashed border-slate-700 hover:border-orange-500 rounded-2xl p-4 text-center transition-all bg-slate-950/50">
+                        <span class="text-xs font-medium text-slate-400">Ajouter Image (PNG)</span>
+                        <input type="file" id="uploadTemplate" accept="image/*" class="hidden">
+                    </div>
+                </label>
+            </div>
 
-                    <button id="btnClearCache" class="text-[10px] text-slate-500 hover:text-red-400 transition-colors uppercase font-bold text-left px-1">
-                        Effacer les paramètres mémorisés
-                    </button>
-                </div>
+            <!-- CACHE -->
+            <div class="pt-4 border-t border-slate-800">
+                <button id="btnClearCache" class="text-[10px] text-slate-500 hover:text-red-400 transition-colors uppercase font-bold">
+                    Réinitialiser le studio
+                </button>
             </div>
 
             <div id="resultArea" class="pt-4 border-t border-slate-800 hidden">
-                <h2 class="text-base sm:text-lg font-bold mb-3 text-yellow-400">Capture</h2>
+                <h2 class="text-base sm:text-lg font-bold mb-3 text-yellow-400">Dernière Capture</h2>
                 <div id="gallery"></div>
             </div>
         </div>
@@ -186,51 +209,66 @@
         const editorZone = document.getElementById('editorZone');
         const fileNameInput = document.getElementById('fileNameInput');
         const toggle3D = document.getElementById('toggle3D');
+        const text3DInput = document.getElementById('text3DInput');
+        const fontSelect = document.getElementById('fontSelect');
         const btnClearCache = document.getElementById('btnClearCache');
+        const container3D = document.getElementById('threeCanvasContainer');
 
         let scene, camera, renderer, textMesh;
-        let isDragging = false, isResizing = false;
+        let isDraggingText = false, isDraggingImg = false, isResizingImg = false;
         let startX, startY, startW, startLeft, startTop;
-        let currentFacingMode = 'user'; // 'user' ou 'environment'
+        let currentFacingMode = 'user';
 
-        // --- GESTION DU CACHE (LocalStorage) ---
+        // Raycaster pour détecter le texte 3D
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // --- CACHE ---
         const CACHE_KEYS = {
-            FILENAME: 'photomaton_filename',
-            TOGGLE3D: 'photomaton_3d_enabled',
-            TEMPLATE_IMAGE: 'photomaton_template_src',
-            TEMPLATE_POS: 'photomaton_template_pos'
+            FILENAME: 'photomaton_v2_filename',
+            TOGGLE3D: 'photomaton_v2_3d_on',
+            TEXTCONTENT: 'photomaton_v2_text',
+            FONTSTYLE: 'photomaton_v2_font',
+            TEXTPOS: 'photomaton_v2_textpos',
+            TEMPLATE_IMAGE: 'photomaton_v2_img_src',
+            TEMPLATE_POS: 'photomaton_v2_img_pos'
         };
 
         function saveSettings() {
             localStorage.setItem(CACHE_KEYS.FILENAME, fileNameInput.value);
             localStorage.setItem(CACHE_KEYS.TOGGLE3D, toggle3D.checked);
+            localStorage.setItem(CACHE_KEYS.TEXTCONTENT, text3DInput.value);
+            localStorage.setItem(CACHE_KEYS.FONTSTYLE, fontSelect.value);
             
-            // On sauvegarde aussi la position du cadre si visible
+            if (textMesh) {
+                localStorage.setItem(CACHE_KEYS.TEXTPOS, JSON.stringify({
+                    x: textMesh.position.x,
+                    y: textMesh.position.y,
+                    scale: textMesh.scale.x
+                }));
+            }
+
             if (!templateWrapper.classList.contains('hidden')) {
-                const pos = {
+                localStorage.setItem(CACHE_KEYS.TEMPLATE_POS, JSON.stringify({
                     top: templateWrapper.style.top,
                     left: templateWrapper.style.left,
                     width: templateWrapper.style.width
-                };
-                localStorage.setItem(CACHE_KEYS.TEMPLATE_POS, JSON.stringify(pos));
+                }));
             }
         }
 
         function loadSettings() {
-            const cachedName = localStorage.getItem(CACHE_KEYS.FILENAME);
-            if (cachedName !== null) fileNameInput.value = cachedName;
-
-            const cached3D = localStorage.getItem(CACHE_KEYS.TOGGLE3D);
-            if (cached3D !== null) toggle3D.checked = (cached3D === 'true');
+            fileNameInput.value = localStorage.getItem(CACHE_KEYS.FILENAME) || "";
+            toggle3D.checked = localStorage.getItem(CACHE_KEYS.TOGGLE3D) !== 'false';
+            text3DInput.value = localStorage.getItem(CACHE_KEYS.TEXTCONTENT) || "JOYEUX\nANNIVERSAIRE";
+            fontSelect.value = localStorage.getItem(CACHE_KEYS.FONTSTYLE) || "helvetiker_bold";
 
             const cachedImg = localStorage.getItem(CACHE_KEYS.TEMPLATE_IMAGE);
             if (cachedImg) {
                 templateOverlay.src = cachedImg;
                 templateWrapper.classList.remove('hidden');
-                
-                const cachedPos = localStorage.getItem(CACHE_KEYS.TEMPLATE_POS);
-                if (cachedPos) {
-                    const pos = JSON.parse(cachedPos);
+                const pos = JSON.parse(localStorage.getItem(CACHE_KEYS.TEMPLATE_POS));
+                if (pos) {
                     templateWrapper.style.top = pos.top;
                     templateWrapper.style.left = pos.left;
                     templateWrapper.style.width = pos.width;
@@ -238,234 +276,236 @@
             }
         }
 
-        btnClearCache.addEventListener('click', () => {
-            if(confirm("Effacer tous les paramètres sauvegardés ?")) {
-                localStorage.clear();
-                window.location.reload();
-            }
-        });
-
-        // --- Configuration THREE.JS ---
+        // --- THREE.JS ---
         function init3D() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(45, editorZone.clientWidth / editorZone.clientHeight, 0.1, 1000);
             renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
             renderer.setSize(editorZone.clientWidth, editorZone.clientHeight);
-            document.getElementById('threeCanvasContainer').appendChild(renderer.domElement);
+            container3D.appendChild(renderer.domElement);
 
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1);
             scene.add(ambientLight);
-            const pointLight = new THREE.PointLight(0xffd700, 1.5);
-            pointLight.position.set(10, 10, 10);
-            scene.add(pointLight);
-
-            const loader = new THREE.FontLoader();
-            loader.load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', function (font) {
-                const textGeo = new THREE.TextGeometry('JOYEUX\nANNIVERSAIRE', {
-                    font: font,
-                    size: 0.5,
-                    height: 0.2,
-                    curveSegments: 12,
-                    bevelEnabled: true,
-                    bevelThickness: 0.03,
-                    bevelSize: 0.02
-                });
-                textGeo.center();
-                const material = new THREE.MeshPhongMaterial({ color: 0xffcc00, specular: 0xffffff, shininess: 100 });
-                textMesh = new THREE.Mesh(textGeo, material);
-                textMesh.position.y = 1;
-                scene.add(textMesh);
-            });
-
+            
+            updateText3D();
             camera.position.z = 5;
             animate3D();
         }
 
+        function updateText3D() {
+            if (!toggle3D.checked) {
+                if (textMesh) textMesh.visible = false;
+                return;
+            }
+
+            const loader = new THREE.FontLoader();
+            const fontName = fontSelect.value;
+            loader.load(`https://threejs.org/examples/fonts/${fontName}.typeface.json`, function (font) {
+                if (textMesh) scene.remove(textMesh);
+                
+                const textGeo = new THREE.TextGeometry(text3DInput.value, {
+                    font: font,
+                    size: 0.4,
+                    height: 0.1,
+                    curveSegments: 12,
+                    bevelEnabled: true,
+                    bevelThickness: 0.02,
+                    bevelSize: 0.01
+                });
+                textGeo.center();
+                
+                const material = new THREE.MeshPhongMaterial({ color: 0xffcc00, shininess: 100 });
+                textMesh = new THREE.Mesh(textGeo, material);
+                
+                // Charger la position du cache
+                const cachedPos = JSON.parse(localStorage.getItem(CACHE_KEYS.TEXTPOS));
+                if (cachedPos) {
+                    textMesh.position.set(cachedPos.x, cachedPos.y, 0);
+                    textMesh.scale.setScalar(cachedPos.scale);
+                } else {
+                    textMesh.position.y = 1;
+                }
+                
+                scene.add(textMesh);
+            });
+        }
+
         function animate3D() {
             requestAnimationFrame(animate3D);
-            if (textMesh) {
-                textMesh.rotation.y = Math.sin(Date.now() * 0.002) * 0.2;
-                textMesh.position.y = 1 + Math.sin(Date.now() * 0.003) * 0.1;
+            if (textMesh && !isDraggingText) {
+                textMesh.rotation.y = Math.sin(Date.now() * 0.001) * 0.1;
             }
             renderer.render(scene, camera);
         }
 
-        // --- Init Caméra avec Switch ---
-        async function initCam() {
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
+        // --- INTERACTIONS CANVAS (Titre 3D) ---
+        container3D.addEventListener('mousedown', onPointerDown, false);
+        container3D.addEventListener('touchstart', onPointerDown, {passive: false});
 
-            if (currentFacingMode === 'user') {
-                video.classList.add('mirror');
-            } else {
-                video.classList.remove('mirror');
-            }
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: currentFacingMode,
-                        width: { ideal: 1280 }, 
-                        height: { ideal: 720 } 
-                    } 
-                });
-                video.srcObject = stream;
-            } catch (e) { 
-                document.getElementById('errorOverlay').style.display = 'flex'; 
-            }
-        }
-
-        btnSwitchCam.addEventListener('click', () => {
-            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-            initCam();
-        });
-
-        // --- Interactions (Drag & Resize) ---
-        function handleStart(e) {
+        function onPointerDown(e) {
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             
-            if (e.target.id === 'resizeHandle') { 
-                isResizing = true; 
-            } else { 
-                isDragging = true; 
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children);
+
+            if (intersects.length > 0) {
+                isDraggingText = true;
+                startX = clientX;
+                startY = clientY;
             }
+        }
+
+        window.addEventListener('mousemove', onPointerMove);
+        window.addEventListener('touchmove', onPointerMove, {passive: false});
+
+        function onPointerMove(e) {
+            if (!isDraggingText) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const dx = (clientX - startX) * 0.01;
+            const dy = (clientY - startY) * 0.01;
+
+            if (textMesh) {
+                textMesh.position.x += dx;
+                textMesh.position.y -= dy;
+            }
+
+            startX = clientX;
+            startY = clientY;
+            saveSettings();
+        }
+
+        window.addEventListener('mouseup', () => isDraggingText = false);
+        window.addEventListener('touchend', () => isDraggingText = false);
+
+        // --- INTERACTIONS IMAGE (Cadre) ---
+        templateWrapper.addEventListener('mousedown', (e) => handleImgStart(e));
+        templateWrapper.addEventListener('touchstart', (e) => handleImgStart(e));
+
+        function handleImgStart(e) {
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            if (e.target.id === 'resizeHandle') isResizingImg = true;
+            else isDraggingImg = true;
+
             startX = clientX; startY = clientY;
             startLeft = templateWrapper.offsetLeft; startTop = templateWrapper.offsetTop;
             startW = templateWrapper.offsetWidth;
             templateWrapper.classList.add('active');
         }
 
-        function handleMove(e) {
-            if (!isDragging && !isResizing) return;
+        window.addEventListener('mousemove', (e) => {
+            if (!isDraggingImg && !isResizingImg) return;
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-            if (isDragging) {
+            if (isDraggingImg) {
                 templateWrapper.style.left = (startLeft + (clientX - startX)) + 'px';
                 templateWrapper.style.top = (startTop + (clientY - startY)) + 'px';
             }
-            if (isResizing) {
+            if (isResizingImg) {
                 templateWrapper.style.width = Math.max(50, startW + (clientX - startX)) + 'px';
             }
-            saveSettings(); // Sauvegarde position temps réel
-            e.preventDefault();
+        });
+
+        window.addEventListener('mouseup', () => { 
+            isDraggingImg = false; isResizingImg = false; 
+            templateWrapper.classList.remove('active');
+            saveSettings();
+        });
+
+        // --- CAMERA & UI ---
+        async function initCam() {
+            if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+            video.classList.toggle('mirror', currentFacingMode === 'user');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: currentFacingMode, width: 1280, height: 720 } 
+                });
+                video.srcObject = stream;
+            } catch (e) { document.getElementById('errorOverlay').style.display = 'flex'; }
         }
 
-        templateWrapper.addEventListener('mousedown', handleStart);
-        templateWrapper.addEventListener('touchstart', handleStart);
-        window.addEventListener('mousemove', handleMove);
-        window.addEventListener('touchmove', handleMove, { passive: false });
-        window.addEventListener('mouseup', () => { isDragging = false; isResizing = false; saveSettings(); });
-        window.addEventListener('touchend', () => { isDragging = false; isResizing = false; saveSettings(); });
+        btnSwitchCam.onclick = () => { currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user'; initCam(); };
+        
+        text3DInput.oninput = () => { updateText3D(); saveSettings(); };
+        fontSelect.onchange = () => { updateText3D(); saveSettings(); };
+        toggle3D.onchange = () => { updateText3D(); saveSettings(); };
+        fileNameInput.oninput = saveSettings;
 
-        // --- Upload ---
-        uploadTemplate.addEventListener('change', (e) => {
+        uploadTemplate.onchange = (e) => {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = (f) => {
-                    const dataUrl = f.target.result;
-                    templateOverlay.src = dataUrl;
+                const r = new FileReader();
+                r.onload = (f) => {
+                    templateOverlay.src = f.target.result;
                     templateWrapper.classList.remove('hidden');
-                    
-                    // On essaie de sauvegarder l'image en cache
-                    try {
-                        localStorage.setItem(CACHE_KEYS.TEMPLATE_IMAGE, dataUrl);
-                    } catch (err) {
-                        console.warn("L'image est trop lourde pour le cache du navigateur.");
-                    }
+                    try { localStorage.setItem(CACHE_KEYS.TEMPLATE_IMAGE, f.target.result); } catch(e){}
+                    saveSettings();
                 };
-                reader.readAsDataURL(file);
+                r.readAsDataURL(file);
             }
-        });
+        };
 
-        // --- Listeners pour auto-save ---
-        fileNameInput.addEventListener('input', saveSettings);
-        toggle3D.addEventListener('change', saveSettings);
-
-        // --- Capture ---
-        btnCapture.addEventListener('click', () => {
-            let count = 3;
+        // --- CAPTURE ---
+        btnCapture.onclick = () => {
+            let c = 3;
             countdownEl.classList.remove('hidden');
-            const timer = setInterval(() => {
-                countdownEl.textContent = count;
-                if (count <= 0) {
-                    clearInterval(timer);
+            const t = setInterval(() => {
+                countdownEl.textContent = c;
+                if (c-- <= 0) {
+                    clearInterval(t);
                     countdownEl.classList.add('hidden');
-                    capturePhoto();
+                    doCapture();
                 }
-                count--;
             }, 800);
-        });
+        };
 
-        function capturePhoto() {
+        function doCapture() {
             flashOverlay.classList.add('animate-flash');
             setTimeout(() => flashOverlay.classList.remove('animate-flash'), 400);
 
-            const vW = video.videoWidth;
-            const vH = video.videoHeight;
-            canvas.width = vW;
-            canvas.height = vH;
+            const vW = video.videoWidth, vH = video.videoHeight;
+            canvas.width = vW; canvas.height = vH;
             const ctx = canvas.getContext('2d');
 
             ctx.save();
-            if (currentFacingMode === 'user') {
-                ctx.translate(vW, 0); ctx.scale(-1, 1);
-            }
+            if (currentFacingMode === 'user') { ctx.translate(vW, 0); ctx.scale(-1, 1); }
             ctx.drawImage(video, 0, 0, vW, vH);
             ctx.restore();
 
-            if (toggle3D.checked) {
+            if (toggle3D.checked && renderer) {
                 renderer.render(scene, camera);
                 ctx.drawImage(renderer.domElement, 0, 0, vW, vH);
             }
 
             if (!templateWrapper.classList.contains('hidden')) {
-                const editorRect = editorZone.getBoundingClientRect();
-                const wrapperRect = templateWrapper.getBoundingClientRect();
-                const sX = vW / editorRect.width;
-                const sY = vH / editorRect.height;
-                ctx.drawImage(templateOverlay, 
-                    (wrapperRect.left - editorRect.left) * sX, 
-                    (wrapperRect.top - editorRect.top) * sY, 
-                    wrapperRect.width * sX, 
-                    wrapperRect.height * sY
-                );
+                const rect = editorZone.getBoundingClientRect();
+                const wrap = templateWrapper.getBoundingClientRect();
+                const sx = vW / rect.width, sy = vH / rect.height;
+                ctx.drawImage(templateOverlay, (wrap.left-rect.left)*sx, (wrap.top-rect.top)*sy, wrap.width*sx, wrap.height*sy);
             }
 
-            const now = new Date();
-            const dateStr = `${String(now.getDate()).padStart(2,'0')}${String(now.getMonth()+1).padStart(2,'0')}${now.getFullYear()}`;
-            const prefix = fileNameInput.value.trim().replace(/[^a-z0-9]/gi, '_') || 'capture';
-            const fileName = `${prefix}_${dateStr}.png`;
-
+            const name = (fileNameInput.value || 'photo') + '_' + Date.now() + '.png';
             const url = canvas.toDataURL('image/png');
             document.getElementById('resultArea').classList.remove('hidden');
-            gallery.innerHTML = `
-                <div class="space-y-3">
-                    <img src="${url}" class="w-full rounded-xl shadow-2xl border border-slate-700">
-                    <a href="${url}" download="${fileName}" class="block w-full text-center bg-yellow-500 text-black font-black py-3 rounded-xl">TÉLÉCHARGER</a>
-                    <p class="text-[10px] text-center text-slate-500 italic">${fileName}</p>
-                </div>
-            `;
+            gallery.innerHTML = `<img src="${url}" class="rounded-xl border border-slate-700 shadow-lg"><a href="${url}" download="${name}" class="mt-2 block bg-blue-600 text-center py-2 rounded-lg text-sm font-bold">TELECHARGER</a>`;
         }
 
-        window.onload = () => {
-            initCam();
-            init3D();
-            loadSettings(); // Restaurer les paramètres au chargement
-        };
+        btnClearCache.onclick = () => { if(confirm("Vider le cache ?")) { localStorage.clear(); location.reload(); } };
 
-        window.addEventListener('resize', () => {
-            if (renderer && camera && editorZone) {
-                const w = editorZone.clientWidth;
-                const h = editorZone.clientHeight;
-                renderer.setSize(w, h);
-                camera.aspect = w / h;
-                camera.updateProjectionMatrix();
-            }
-        });
+        window.onload = () => { loadSettings(); initCam(); init3D(); };
+        window.onresize = () => {
+            const w = editorZone.clientWidth, h = editorZone.clientHeight;
+            renderer.setSize(w, h); camera.aspect = w/h; camera.updateProjectionMatrix();
+        };
     </script>
 </body>
 </html>
