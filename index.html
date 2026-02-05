@@ -20,11 +20,16 @@
         .preview-container {
             position: relative;
             width: 100%;
-            aspect-ratio: 4/3;
             background: #000;
             overflow: hidden;
             flex-shrink: 0;
+            transition: aspect-ratio 0.3s ease;
+            margin: 0 auto;
         }
+
+        /* Classes de format */
+        .format-portrait { aspect-ratio: 9/16; max-height: 60vh; }
+        .format-landscape { aspect-ratio: 16/9; width: 100%; }
         
         #videoFeed { width: 100%; height: 100%; object-fit: cover; background: #111; }
         .mirror { transform: scaleX(-1); }
@@ -121,7 +126,7 @@
 <body class="bg-slate-950 text-slate-100 font-sans">
 
     <!-- Zone de Visualisation -->
-    <div class="preview-container" id="editorZone">
+    <div class="preview-container format-landscape" id="editorZone">
         <video id="videoFeed" autoplay playsinline muted class="mirror"></video>
         
         <div id="cameraError">
@@ -143,9 +148,15 @@
             <div class="resize-handle"></div>
         </div>
 
-        <button id="btnSwitchCam" class="absolute top-4 right-4 z-20 bg-black/40 backdrop-blur-md p-3 rounded-full border border-white/20 active:scale-90 transition-transform">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-        </button>
+        <!-- Boutons d'action rapides -->
+        <div class="absolute top-4 right-4 z-20 flex flex-col gap-3">
+            <button id="btnSwitchCam" class="bg-black/40 backdrop-blur-md p-3 rounded-full border border-white/20 active:scale-90 transition-transform">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            </button>
+            <button id="btnToggleFormat" class="bg-black/40 backdrop-blur-md p-3 rounded-full border border-white/20 active:scale-90 transition-transform">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+            </button>
+        </div>
 
         <div id="flashOverlay" class="flash"></div>
         <div id="countdown" class="absolute inset-0 flex items-center justify-center text-8xl font-black text-white hidden z-[100] pointer-events-none"></div>
@@ -162,7 +173,7 @@
 
         <!-- Input Texte -->
         <div class="grid grid-cols-4 gap-2">
-            <input type="text" id="text3DInput" class="col-span-3 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Votre texte 3D...">
+            <input type="text" id="text3DInput" class="col-span-3 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Texte 3D...">
             <button onclick="addElement('text3DWrapper')" class="bg-slate-800 rounded-xl flex items-center justify-center active:bg-slate-700 border border-slate-700">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
             </button>
@@ -190,6 +201,7 @@
         
         let scene, camera, renderer, textMesh;
         let currentFacingMode = 'user';
+        let currentFormat = 'landscape'; // landscape or portrait
         let activeElement = null;
         let isDragging = false, isResizing = false;
         let startX, startY, startW, startH, startL, startT;
@@ -201,6 +213,15 @@
             'https://img.icons8.com/color/512/thug-life-glasses.png',
             'https://img.icons8.com/color/512/super-mario.png'
         ];
+
+        function toggleFormat() {
+            currentFormat = currentFormat === 'landscape' ? 'portrait' : 'landscape';
+            editorZone.classList.remove('format-landscape', 'format-portrait');
+            editorZone.classList.add(`format-${currentFormat}`);
+            
+            // Re-centrer les éléments si besoin ou forcer le refresh 3D
+            onTextContainerResize();
+        }
 
         function removeElement(id) { document.getElementById(id).classList.add('hidden'); }
         function addElement(id) {
@@ -301,19 +322,15 @@
             }
             video.classList.toggle('mirror', currentFacingMode === 'user');
             
-            // Paramètres simplifiés pour maximiser la compatibilité
             const constraints = { 
-                video: { 
-                    facingMode: currentFacingMode 
-                },
+                video: { facingMode: currentFacingMode },
                 audio: false
             };
 
             try {
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
-                // S'assurer que la vidéo joue (nécessaire sur certains navigateurs mobiles)
-                video.play().catch(e => console.warn("Auto-play bloqué, attente interaction."));
+                video.play().catch(e => console.warn("Auto-play bloqué."));
             } catch (e) { 
                 console.error("Erreur caméra:", e);
                 cameraError.style.display = 'flex';
@@ -323,15 +340,45 @@
         function doCapture() {
             const vW = video.videoWidth, vH = video.videoHeight;
             if (vW === 0) return;
-            canvas.width = vW; canvas.height = vH;
+
+            // Calcul des dimensions de sortie selon le format choisi
+            const rect = editorZone.getBoundingClientRect();
+            const targetRatio = rect.width / rect.height;
+            
+            // On définit la taille du canvas selon le format cible tout en gardant une haute résolution
+            canvas.width = (currentFormat === 'portrait') ? 720 : 1280;
+            canvas.height = canvas.width / targetRatio;
+            
+            const sx = canvas.width / rect.width;
+            const sy = canvas.height / rect.height;
+
+            // 1. Dessiner la vidéo (en mode cover pour remplir le canvas)
+            const videoRatio = vW / vH;
+            let drawW, drawH, drawX, drawY;
+            
+            if (videoRatio > targetRatio) {
+                drawH = canvas.height;
+                drawW = canvas.height * videoRatio;
+                drawX = (canvas.width - drawW) / 2;
+                drawY = 0;
+            } else {
+                drawW = canvas.width;
+                drawH = canvas.width / videoRatio;
+                drawX = 0;
+                drawY = (canvas.height - drawH) / 2;
+            }
+
             ctx.save();
-            if(currentFacingMode === 'user') { ctx.translate(vW, 0); ctx.scale(-1, 1); }
-            ctx.drawImage(video, 0, 0, vW, vH);
+            if(currentFacingMode === 'user') {
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, -drawX, drawY, -drawW, drawH);
+            } else {
+                ctx.drawImage(video, drawX, drawY, drawW, drawH);
+            }
             ctx.restore();
 
-            const rect = editorZone.getBoundingClientRect();
-            const sx = vW / rect.width; const sy = vH / rect.height;
-
+            // 2. Dessiner les overlays
             const txtWrap = document.getElementById('text3DWrapper');
             if (!txtWrap.classList.contains('hidden')) {
                 const w = txtWrap.getBoundingClientRect();
@@ -345,7 +392,11 @@
 
             const url = canvas.toDataURL('image/png');
             document.getElementById('resultArea').classList.remove('hidden');
-            document.getElementById('gallery').innerHTML = `<img src="${url}" class="w-full"><a href="${url}" download="photo.png" class="block bg-green-600 text-center py-4 font-bold uppercase tracking-widest">Enregistrer</a>`;
+            document.getElementById('gallery').innerHTML = `
+                <div class="p-2 bg-slate-800 text-xs text-center text-slate-400">Photo générée (${canvas.width}x${Math.round(canvas.height)})</div>
+                <img src="${url}" class="w-full">
+                <a href="${url}" download="photomaton_${currentFormat}.png" class="block bg-green-600 text-center py-4 font-bold uppercase tracking-widest active:bg-green-700">Enregistrer l'image</a>
+            `;
             document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' });
         }
 
@@ -389,6 +440,7 @@
             currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user'; 
             initCam(); 
         };
+        document.getElementById('btnToggleFormat').onclick = toggleFormat;
         
         window.onload = () => {
             initLibrary(); 
