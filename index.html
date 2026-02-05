@@ -2,11 +2,12 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Photomaton Studio Pro - Éditeur 3D</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
+        body { touch-action: none; overflow: hidden; }
         .preview-container {
             position: relative;
             width: 100%;
@@ -16,16 +17,10 @@
             border-radius: 1rem;
             overflow: hidden;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            touch-action: none;
         }
-        #videoFeed {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        #videoFeed { width: 100%; height: 100%; object-fit: cover; }
         .mirror { transform: scaleX(-1); }
 
-        /* Style commun pour les éléments déplaçables */
         .draggable-element {
             position: absolute;
             cursor: move;
@@ -33,114 +28,114 @@
             z-index: 10;
             border: 2px dashed transparent;
             touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .draggable-element.active {
             border-color: #3b82f6;
             background: rgba(59, 130, 246, 0.1);
+            z-index: 30;
         }
         
-        #templateWrapper { top: 10%; left: 10%; width: 150px; }
-        #text3DWrapper { top: 40%; left: 30%; width: 250px; height: 100px; }
+        #templateWrapper { top: 10%; left: 10%; width: 120px; }
+        #text3DWrapper { top: 40%; left: 30%; width: 200px; height: 80px; }
 
+        /* Poignées et Contrôles */
         .resize-handle {
             position: absolute;
-            width: 24px;
-            height: 24px;
+            width: 32px;
+            height: 32px;
             background: #3b82f6;
             border: 3px solid white;
             border-radius: 50%;
-            bottom: -12px;
-            right: -12px;
+            bottom: -16px;
+            right: -16px;
             cursor: nwse-resize;
             display: none;
-            z-index: 20;
+            z-index: 40;
         }
-        .active .resize-handle { display: block; }
+        .delete-btn {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background: #ef4444;
+            border: 3px solid white;
+            border-radius: 50%;
+            top: -16px;
+            left: -16px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 40;
+        }
+        .active .resize-handle, .active .delete-btn { display: flex; }
 
-        #threeCanvasContainer {
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        .flash {
-            position: absolute; inset: 0; background: white; opacity: 0; pointer-events: none; z-index: 100;
-        }
+        #threeCanvasContainer { width: 100%; height: 100%; pointer-events: none; }
+        .flash { position: absolute; inset: 0; background: white; opacity: 0; pointer-events: none; z-index: 100; }
         @keyframes flash-anim { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
         .animate-flash { animation: flash-anim 0.4s ease-out; }
-        
-        #errorOverlay {
-            position: absolute; inset: 0; background: rgba(0,0,0,0.8);
-            display: none; flex-direction: column; align-items: center;
-            justify-content: center; z-index: 50;
-        }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center p-2 sm:p-4 font-sans">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center p-2 font-sans">
 
-    <header class="text-center mb-4">
-        <h1 class="text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-orange-500 to-red-600">
-            STUDIO 3D PRO
+    <header class="text-center mb-2">
+        <h1 class="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-red-600 uppercase">
+            Studio Mobile 3D
         </h1>
     </header>
 
-    <main class="w-full max-w-6xl grid grid-cols-1 xl:grid-cols-4 gap-4">
+    <main class="w-full max-w-6xl grid grid-cols-1 xl:grid-cols-4 gap-4 overflow-y-auto pb-20">
         
         <div class="xl:col-span-3 flex flex-col items-center">
             <div class="preview-container border border-slate-800" id="editorZone">
                 <video id="videoFeed" autoplay playsinline muted class="mirror"></video>
 
                 <!-- Element Image -->
-                <div id="templateWrapper" class="draggable-element hidden" data-type="img">
+                <div id="templateWrapper" class="draggable-element hidden">
+                    <div class="delete-btn" onclick="removeElement('templateWrapper')">✕</div>
                     <img id="templateOverlay" src="" alt="" class="w-full h-auto pointer-events-none" crossorigin="anonymous">
                     <div class="resize-handle"></div>
                 </div>
 
                 <!-- Element Texte 3D -->
-                <div id="text3DWrapper" class="draggable-element" data-type="text">
+                <div id="text3DWrapper" class="draggable-element">
+                    <div class="delete-btn" onclick="removeElement('text3DWrapper')">✕</div>
                     <div id="threeCanvasContainer"></div>
                     <div class="resize-handle"></div>
                 </div>
 
-                <div id="errorOverlay">
-                    <p class="text-white mb-2">Erreur Caméra</p>
-                    <button onclick="initCam()" class="bg-slate-700 px-4 py-2 rounded-lg text-xs">Réessayer</button>
-                </div>
-
-                <button id="btnSwitchCam" class="absolute top-4 right-4 z-20 bg-black/50 p-3 rounded-full border border-white/20">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                <button id="btnSwitchCam" class="absolute top-2 right-2 z-20 bg-black/50 p-3 rounded-full border border-white/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
 
                 <div id="flashOverlay" class="flash"></div>
-                <div id="countdown" class="absolute inset-0 flex items-center justify-center text-8xl font-black text-white hidden z-[100]"></div>
+                <div id="countdown" class="absolute inset-0 flex items-center justify-center text-7xl font-black text-white hidden z-[100]"></div>
             </div>
 
-            <button id="btnCapture" class="mt-4 w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-12 py-4 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
-                📸 PRENDRE LA PHOTO
+            <button id="btnCapture" class="mt-4 w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-all">
+                PRENDRE LA PHOTO
             </button>
         </div>
 
-        <div class="bg-slate-900 p-4 rounded-3xl border border-slate-800 space-y-6">
+        <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-4">
             <div>
-                <h2 class="text-sm font-bold mb-3 text-green-400">Bibliothèque</h2>
-                <div id="libraryGrid" class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto"></div>
+                <h2 class="text-xs font-bold mb-2 text-green-400 uppercase">Bibliothèque</h2>
+                <div id="libraryGrid" class="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto"></div>
             </div>
 
             <div>
-                <h2 class="text-sm font-bold mb-3 text-blue-400">Texte 3D</h2>
-                <div class="space-y-3">
-                    <label class="flex items-center gap-2 text-xs bg-slate-800 p-2 rounded-lg">
-                        <input type="checkbox" id="toggle3D" checked> Afficher
-                    </label>
-                    <textarea id="text3DInput" rows="1" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none" placeholder="Votre texte..."></textarea>
-                </div>
+                <h2 class="text-xs font-bold mb-2 text-blue-400 uppercase">Texte 3D</h2>
+                <input type="text" id="text3DInput" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none mb-2" placeholder="Texte...">
+                <button onclick="addElement('text3DWrapper')" class="w-full bg-slate-800 text-xs py-2 rounded border border-slate-700">RÉAPPARAÎTRE TEXTE</button>
             </div>
 
-            <div class="pt-4 border-t border-slate-800" id="resultArea" class="hidden">
+            <div id="resultArea" class="hidden pt-4 border-t border-slate-800">
                 <div id="gallery"></div>
             </div>
-            
-            <button id="btnClearCache" class="text-[10px] text-slate-500 uppercase">Réinitialiser</button>
         </div>
     </main>
 
@@ -163,15 +158,31 @@
             'https://raw.githubusercontent.com/KaporalClems/Photomaton3D/5dc4e25d47a4d6d178158184765608690f4a7a81/437-4377362_totoro-totoro-and-little-totoros-removebg-preview.png'
         ];
 
-        // --- GESTION DRAG & RESIZE UNIFIÉE ---
+        // --- GESTION ÉLÉMENTS ---
+        function removeElement(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function addElement(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('hidden');
+            el.style.top = "20%"; el.style.left = "20%";
+            selectElement(el);
+        }
+
+        function selectElement(el) {
+            document.querySelectorAll('.draggable-element').forEach(d => d.classList.remove('active'));
+            el.classList.add('active');
+            activeElement = el;
+        }
+
+        // --- TOUCH & MOUSE UNIFIÉ ---
         function makeManipulable(el) {
             const onStart = (e) => {
                 const pointer = e.touches ? e.touches[0] : e;
-                activeElement = el;
+                if(e.target.classList.contains('delete-btn')) return;
                 
-                // Désactiver les autres
-                document.querySelectorAll('.draggable-element').forEach(d => d.classList.remove('active'));
-                el.classList.add('active');
+                selectElement(el);
 
                 if (e.target.classList.contains('resize-handle')) {
                     isResizing = true;
@@ -179,21 +190,17 @@
                     isDragging = true;
                 }
 
-                startX = pointer.clientX;
-                startY = pointer.clientY;
-                startW = el.offsetWidth;
-                startH = el.offsetHeight;
-                startL = el.offsetLeft;
-                startT = el.offsetTop;
-
-                e.preventDefault();
+                startX = pointer.clientX; startY = pointer.clientY;
+                startW = el.offsetWidth; startH = el.offsetHeight;
+                startL = el.offsetLeft; startT = el.offsetTop;
+                if(e.cancelable) e.preventDefault();
             };
 
             el.addEventListener('mousedown', onStart);
             el.addEventListener('touchstart', onStart, {passive: false});
         }
 
-        window.addEventListener('mousemove', (e) => {
+        const onMove = (e) => {
             if (!activeElement || (!isDragging && !isResizing)) return;
             const pointer = e.touches ? e.touches[0] : e;
             const dx = pointer.clientX - startX;
@@ -204,17 +211,18 @@
                 activeElement.style.top = (startT + dy) + 'px';
             }
             if (isResizing) {
-                const nw = Math.max(50, startW + dx);
-                activeElement.style.width = nw + 'px';
+                activeElement.style.width = Math.max(60, startW + dx) + 'px';
                 if (activeElement.id === 'text3DWrapper') {
-                    activeElement.style.height = Math.max(30, startH + dy) + 'px';
+                    activeElement.style.height = Math.max(40, startH + dy) + 'px';
                     onTextContainerResize();
                 }
             }
-        });
+        };
 
-        window.addEventListener('mouseup', () => { isDragging = isResizing = false; saveSettings(); });
-        window.addEventListener('touchend', () => { isDragging = isResizing = false; saveSettings(); });
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('touchmove', onMove, {passive: false});
+        window.addEventListener('mouseup', () => isDragging = isResizing = false);
+        window.addEventListener('touchend', () => isDragging = isResizing = false);
 
         // --- THREE.JS ---
         function init3D() {
@@ -222,15 +230,16 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
             renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(container.clientWidth, container.clientHeight);
             container.appendChild(renderer.domElement);
-            scene.add(new THREE.AmbientLight(0xffffff, 1));
+            scene.add(new THREE.AmbientLight(0xffffff, 1.2));
             camera.position.z = 3;
             updateText3D();
             
             const animate = () => {
                 requestAnimationFrame(animate);
-                if(textMesh) textMesh.rotation.y = Math.sin(Date.now()*0.001)*0.2;
+                if(textMesh) textMesh.rotation.y += 0.01;
                 renderer.render(scene, camera);
             };
             animate();
@@ -247,10 +256,6 @@
 
         function updateText3D() {
             const text = document.getElementById('text3DInput').value || "HELLO";
-            const visible = document.getElementById('toggle3D').checked;
-            document.getElementById('text3DWrapper').style.display = visible ? 'block' : 'none';
-            if(!visible) return;
-
             new THREE.FontLoader().load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', (font) => {
                 if (textMesh) scene.remove(textMesh);
                 const geo = new THREE.TextGeometry(text, { font: font, size: 0.5, height: 0.1, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02 });
@@ -267,7 +272,7 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode, width: 1280, height: 720 } });
                 video.srcObject = stream;
-            } catch (e) { document.getElementById('errorOverlay').style.display = 'flex'; }
+            } catch (e) { alert("Caméra indisponible"); }
         }
 
         function doCapture() {
@@ -275,7 +280,6 @@
             if (vW === 0) return;
             canvas.width = vW; canvas.height = vH;
             
-            // 1. Vidéo
             ctx.save();
             if(currentFacingMode === 'user') { ctx.translate(vW, 0); ctx.scale(-1, 1); }
             ctx.drawImage(video, 0, 0, vW, vH);
@@ -285,13 +289,14 @@
             const sx = vW / rect.width;
             const sy = vH / rect.height;
 
-            // 2. Texte 3D
-            if (document.getElementById('toggle3D').checked) {
-                const w = document.getElementById('text3DWrapper').getBoundingClientRect();
+            // Texte 3D
+            const txtWrap = document.getElementById('text3DWrapper');
+            if (!txtWrap.classList.contains('hidden')) {
+                const w = txtWrap.getBoundingClientRect();
                 ctx.drawImage(renderer.domElement, (w.left - rect.left) * sx, (w.top - rect.top) * sy, w.width * sx, w.height * sy);
             }
 
-            // 3. Image Overlay
+            // Image Overlay
             const imgWrap = document.getElementById('templateWrapper');
             if (!imgWrap.classList.contains('hidden')) {
                 const w = imgWrap.getBoundingClientRect();
@@ -300,17 +305,18 @@
 
             const url = canvas.toDataURL('image/png');
             document.getElementById('resultArea').classList.remove('hidden');
-            document.getElementById('gallery').innerHTML = `<img src="${url}" class="rounded-lg mb-2"><a href="${url}" download="photo.png" class="block bg-blue-600 text-center py-2 rounded font-bold">TELECHARGER</a>`;
+            document.getElementById('gallery').innerHTML = `<img src="${url}" class="rounded-lg mb-2 shadow-xl"><a href="${url}" download="photo.png" class="block bg-green-600 text-center py-3 rounded-lg font-bold">ENREGISTRER</a>`;
+            document.getElementById('resultArea').scrollIntoView();
         }
 
         // --- INIT ---
         function loadTemplate(src) {
+            const wrap = document.getElementById('templateWrapper');
             const img = document.getElementById('templateOverlay');
             img.src = src;
             img.onload = () => {
-                document.getElementById('templateWrapper').classList.remove('hidden');
-                document.getElementById('templateWrapper').classList.add('active');
-                activeElement = document.getElementById('templateWrapper');
+                wrap.classList.remove('hidden');
+                selectElement(wrap);
             };
         }
 
@@ -319,18 +325,10 @@
             libraryImages.forEach(src => {
                 const img = document.createElement('img');
                 img.src = src;
-                img.className = 'w-full h-16 object-contain bg-slate-800 rounded cursor-pointer border-2 border-transparent hover:border-green-500';
+                img.className = 'w-full h-12 object-contain bg-slate-800 rounded p-1 border border-slate-700';
                 img.onclick = () => loadTemplate(src);
                 grid.appendChild(img);
             });
-        }
-
-        function saveSettings() {
-            const data = {
-                text: document.getElementById('text3DInput').value,
-                textPos: { t: text3DWrapper.style.top, l: text3DWrapper.style.left, w: text3DWrapper.style.width, h: text3DWrapper.style.height }
-            };
-            localStorage.setItem('studio_3d_v3', JSON.stringify(data));
         }
 
         document.getElementById('btnCapture').onclick = () => {
@@ -340,17 +338,14 @@
                 c--;
                 if(c<=0) { clearInterval(itv); count.classList.add('hidden'); doCapture(); }
                 else count.textContent = c;
-            }, 800);
+            }, 700);
         };
 
         document.getElementById('text3DInput').oninput = updateText3D;
-        document.getElementById('toggle3D').onchange = updateText3D;
         document.getElementById('btnSwitchCam').onclick = () => { currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user'; initCam(); };
         
         window.onload = () => {
-            initLibrary();
-            initCam();
-            init3D();
+            initLibrary(); initCam(); init3D();
             makeManipulable(document.getElementById('templateWrapper'));
             makeManipulable(document.getElementById('text3DWrapper'));
         };
