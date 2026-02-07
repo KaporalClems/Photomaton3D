@@ -209,8 +209,8 @@
         const libraryImages = [
             'https://raw.githubusercontent.com/KaporalClems/Photomaton3D/5dc4e25d47a4d6d178158184765608690f4a7a81/output-onlinegiftools.gif',
             'https://raw.githubusercontent.com/KaporalClems/Photomaton3D/5dc4e25d47a4d6d178158184765608690f4a7a81/437-4377362_totoro-totoro-and-little-totoros-removebg-preview.png',
-            'https://img.icons8.com/color/512/santa-hat.png',
-            'https://img.icons8.com/color/512/thug-life-glasses.png',
+            'https://raw.githubusercontent.com/KaporalClems/Photomaton3D/846fb4650282fac245b49055b8ec0f74a74fc3b8/giphy.gif',
+            'https://raw.githubusercontent.com/KaporalClems/Photomaton3D/846fb4650282fac245b49055b8ec0f74a74fc3b8/ghilbi%20le%20chateau.gif',
             'https://img.icons8.com/color/512/super-mario.png'
         ];
 
@@ -345,14 +345,14 @@
             const rect = editorZone.getBoundingClientRect();
             const targetRatio = rect.width / rect.height;
             
-            // On définit la taille du canvas selon le format cible tout en gardant une haute résolution
+            // On définit la taille du canvas selon le format cible
             canvas.width = (currentFormat === 'portrait') ? 720 : 1280;
             canvas.height = canvas.width / targetRatio;
             
             const sx = canvas.width / rect.width;
             const sy = canvas.height / rect.height;
 
-            // 1. Dessiner la vidéo (en mode cover pour remplir le canvas)
+            // 1. Dessiner la vidéo
             const videoRatio = vW / vH;
             let drawW, drawH, drawX, drawY;
             
@@ -370,9 +370,12 @@
 
             ctx.save();
             if(currentFacingMode === 'user') {
+                // CORRECTION ICI: 
+                // On translate à droite, on inverse l'axe X.
+                // Ensuite on dessine avec les coordonnées POSITIVES.
                 ctx.translate(canvas.width, 0);
                 ctx.scale(-1, 1);
-                ctx.drawImage(video, -drawX, drawY, -drawW, drawH);
+                ctx.drawImage(video, drawX, drawY, drawW, drawH);
             } else {
                 ctx.drawImage(video, drawX, drawY, drawW, drawH);
             }
