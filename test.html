@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Photomaton Studio Pro - Éditeur 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root { --safe-bottom: env(safe-area-inset-bottom); }
+        body { 
+            touch-action: none; 
+            overflow: hidden; 
+            height: 100vh; 
+            height: -webkit-fill-available;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .preview-container {
+            position: relative;
+            width: 100%;
+            background: #000;
+            overflow: hidden;
+            flex-shrink: 0;
+            transition: aspect-ratio 0.3s ease;
+            margin: 0 auto;
+        }
+
+        /* Classes de format */
+        .format-portrait { aspect-ratio: 9/16; max-height: 60vh; }
+        .format-landscape { aspect-ratio: 16/9; width: 100%; }
+        
+        #videoFeed { width: 100%; height: 100%; object-fit: cover; background: #111; }
+        .mirror { transform: scaleX(-1); }
+
+        .draggable-element {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+            z-index: 10;
+            border: 2px dashed transparent;
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 44px;
+            min-height: 44px;
+        }
+        .draggable-element.active {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+            z-index: 30;
+        }
+        
+        #templateWrapper { top: 10%; left: 10%; width: 100px; }
+        #text3DWrapper { top: 40%; left: 30%; width: 160px; height: 60px; }
+
+        .resize-handle {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            background: #3b82f6;
+            border: 3px solid white;
+            border-radius: 50%;
+            bottom: -18px;
+            right: -18px;
+            display: none;
+            z-index: 40;
+        }
+        .delete-btn {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            background: #ef4444;
+            border: 3px solid white;
+            border-radius: 50%;
+            top: -18px;
+            left: -18px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            z-index: 40;
+        }
+        .active .resize-handle, .active .delete-btn { display: flex; }
+
+        #threeCanvasContainer { width: 100%; height: 100%; pointer-events: none; }
+        .flash { position: absolute; inset: 0; background: white; opacity: 0; pointer-events: none; z-index: 100; }
+        @keyframes flash-anim { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+        .animate-flash { animation: flash-anim 0.4s ease-out; }
+
+        .library-scroll {
+            display: flex;
+            overflow-x: auto;
+            gap: 12px;
+            padding: 8px 4px;
+            scrollbar-width: none;
+        }
+        .library-scroll::-webkit-scrollbar { display: none; }
+        .library-item {
+            flex: 0 0 60px;
+            height: 60px;
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 8px;
+            border: 1px solid #334155;
+        }
+
+        #cameraError {
+            position: absolute;
+            inset: 0;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans">
+
+    <!-- Zone de Visualisation -->
+    <div class="preview-container format-landscape" id="editorZone">
+        <video id="videoFeed" autoplay playsinline muted class="mirror"></video>
+        
+        <div id="cameraError">
+            <p class="mb-4 text-sm text-red-400">Accès caméra refusé ou indisponible.</p>
+            <button onclick="initCam()" class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold">Réessayer l'accès</button>
+        </div>
+
+        <!-- Element Image -->
+        <div id="templateWrapper" class="draggable-element hidden">
+            <div class="delete-btn" onclick="removeElement('templateWrapper')">✕</div>
+            <img id="templateOverlay" src="" alt="" class="w-full h-auto pointer-events-none" crossorigin="anonymous">
+            <div class="resize-handle"></div>
+        </div>
+
+        <!-- Element Texte 3D -->
+        <div id="text3DWrapper" class="draggable-element">
+            <div class="delete-btn" onclick="removeElement('text3DWrapper')">✕</div>
+            <div id="threeCanvasContainer"></div>
+            <div class="resize-handle"></div>
+        </div>
+
+        <!-- Boutons d'action rapides -->
+        <div class="absolute top-4 right-4 z-20 flex flex-col gap-3">
+            <button id="btnSwitchCam" class="bg-black/40 backdrop-blur-md p-3 rounded-full border border-white/20 active:scale-90 transition-transform">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            </button>
+            <button id="btnToggleFormat" class="bg-black/40 backdrop-blur-md p-3 rounded-full border border-white/20 active:scale-90 transition-transform">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+            </button>
+        </div>
+
+        <div id="flashOverlay" class="flash"></div>
+        <div id="countdown" class="absolute inset-0 flex items-center justify-center text-8xl font-black text-white hidden z-[100] pointer-events-none"></div>
+    </div>
+
+    <!-- Interface de contrôle -->
+    <div class="flex-1 flex flex-col p-4 space-y-4 overflow-y-auto bg-slate-900 rounded-t-3xl shadow-2xl border-t border-slate-800">
+        
+        <!-- Bibliothèque Horizontale -->
+        <div>
+            <h2 class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2 px-1">Accessoires</h2>
+            <div id="libraryGrid" class="library-scroll"></div>
+        </div>
+
+        <!-- Input Texte -->
+        <div class="grid grid-cols-4 gap-2">
+            <input type="text" id="text3DInput" class="col-span-3 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Texte 3D...">
+            <button onclick="addElement('text3DWrapper')" class="bg-slate-800 rounded-xl flex items-center justify-center active:bg-slate-700 border border-slate-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+            </button>
+        </div>
+
+        <!-- Bouton Capture Principal -->
+        <button id="btnCapture" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-2xl font-black text-lg shadow-lg active:scale-95 transition-all uppercase tracking-widest">
+            Prendre la photo
+        </button>
+
+        <!-- Zone de résultat -->
+        <div id="resultArea" class="hidden pb-8">
+            <div id="gallery" class="rounded-2xl overflow-hidden border border-slate-700"></div>
+        </div>
+    </div>
+
+    <canvas id="canvasProcess" class="hidden"></canvas>
+
+    <script>
+        const video = document.getElementById('videoFeed');
+        const editorZone = document.getElementById('editorZone');
+        const canvas = document.getElementById('canvasProcess');
+        const cameraError = document.getElementById('cameraError');
+        const ctx = canvas.getContext('2d');
+        
+        let scene, camera, renderer, textMesh;
+        let currentFacingMode = 'user';
+        let currentFormat = 'landscape'; // landscape or portrait
+        let activeElement = null;
+        let isDragging = false, isResizing = false;
+        let startX, startY, startW, startH, startL, startT;
+
+        const libraryImages = [
+            'https://raw.githubusercontent.com/KaporalClems/Photomaton3D/5dc4e25d47a4d6d178158184765608690f4a7a81/output-onlinegiftools.gif',
+            'https://raw.githubusercontent.com/KaporalClems/Photomaton3D/5dc4e25d47a4d6d178158184765608690f4a7a81/437-4377362_totoro-totoro-and-little-totoros-removebg-preview.png',
+            'https://img.icons8.com/color/512/santa-hat.png',
+            'https://img.icons8.com/color/512/thug-life-glasses.png',
+            'https://img.icons8.com/color/512/super-mario.png'
+        ];
+
+        function toggleFormat() {
+            currentFormat = currentFormat === 'landscape' ? 'portrait' : 'landscape';
+            editorZone.classList.remove('format-landscape', 'format-portrait');
+            editorZone.classList.add(`format-${currentFormat}`);
+            
+            // Re-centrer les éléments si besoin ou forcer le refresh 3D
+            onTextContainerResize();
+        }
+
+        function removeElement(id) { document.getElementById(id).classList.add('hidden'); }
+        function addElement(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('hidden');
+            el.style.top = "20%"; el.style.left = "20%";
+            selectElement(el);
+        }
+
+        function selectElement(el) {
+            document.querySelectorAll('.draggable-element').forEach(d => d.classList.remove('active'));
+            el.classList.add('active');
+            activeElement = el;
+        }
+
+        function makeManipulable(el) {
+            const onStart = (e) => {
+                const pointer = e.touches ? e.touches[0] : e;
+                if(e.target.classList.contains('delete-btn')) return;
+                selectElement(el);
+                if (e.target.classList.contains('resize-handle')) isResizing = true;
+                else isDragging = true;
+                startX = pointer.clientX; startY = pointer.clientY;
+                startW = el.offsetWidth; startH = el.offsetHeight;
+                startL = el.offsetLeft; startT = el.offsetTop;
+                if(e.cancelable) e.preventDefault();
+            };
+            el.addEventListener('mousedown', onStart);
+            el.addEventListener('touchstart', onStart, {passive: false});
+        }
+
+        const onMove = (e) => {
+            if (!activeElement || (!isDragging && !isResizing)) return;
+            const pointer = e.touches ? e.touches[0] : e;
+            const dx = pointer.clientX - startX;
+            const dy = pointer.clientY - startY;
+            if (isDragging) {
+                activeElement.style.left = (startL + dx) + 'px';
+                activeElement.style.top = (startT + dy) + 'px';
+            }
+            if (isResizing) {
+                activeElement.style.width = Math.max(60, startW + dx) + 'px';
+                if (activeElement.id === 'text3DWrapper') {
+                    activeElement.style.height = Math.max(40, startH + dy) + 'px';
+                    onTextContainerResize();
+                }
+            }
+        };
+
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('touchmove', onMove, {passive: false});
+        window.addEventListener('mouseup', () => isDragging = isResizing = false);
+        window.addEventListener('touchend', () => isDragging = isResizing = false);
+
+        function init3D() {
+            const container = document.getElementById('threeCanvasContainer');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+            camera.position.z = 3;
+            updateText3D();
+            const animate = () => {
+                requestAnimationFrame(animate);
+                if(textMesh) textMesh.rotation.y += 0.015;
+                renderer.render(scene, camera);
+            };
+            animate();
+        }
+
+        function onTextContainerResize() {
+            const container = document.getElementById('threeCanvasContainer');
+            if (renderer && camera) {
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+            }
+        }
+
+        function updateText3D() {
+            const text = document.getElementById('text3DInput').value || "HELLO";
+            new THREE.FontLoader().load('https://threejs.org/examples/fonts/helvetiker_bold.typeface.json', (font) => {
+                if (textMesh) scene.remove(textMesh);
+                const geo = new THREE.TextGeometry(text, { font: font, size: 0.5, height: 0.1, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02 });
+                geo.center();
+                textMesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: 0xffcc00, shininess: 100 }));
+                scene.add(textMesh);
+            });
+        }
+
+        async function initCam() {
+            cameraError.style.display = 'none';
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(t => t.stop());
+            }
+            video.classList.toggle('mirror', currentFacingMode === 'user');
+            
+            const constraints = { 
+                video: { facingMode: currentFacingMode },
+                audio: false
+            };
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                video.play().catch(e => console.warn("Auto-play bloqué."));
+            } catch (e) { 
+                console.error("Erreur caméra:", e);
+                cameraError.style.display = 'flex';
+            }
+        }
+
+        function doCapture() {
+            const vW = video.videoWidth, vH = video.videoHeight;
+            if (vW === 0) return;
+
+            // Calcul des dimensions de sortie selon le format choisi
+            const rect = editorZone.getBoundingClientRect();
+            const targetRatio = rect.width / rect.height;
+            
+            // On définit la taille du canvas selon le format cible
+            canvas.width = (currentFormat === 'portrait') ? 720 : 1280;
+            canvas.height = canvas.width / targetRatio;
+            
+            const sx = canvas.width / rect.width;
+            const sy = canvas.height / rect.height;
+
+            // 1. Dessiner la vidéo
+            const videoRatio = vW / vH;
+            let drawW, drawH, drawX, drawY;
+            
+            if (videoRatio > targetRatio) {
+                drawH = canvas.height;
+                drawW = canvas.height * videoRatio;
+                drawX = (canvas.width - drawW) / 2;
+                drawY = 0;
+            } else {
+                drawW = canvas.width;
+                drawH = canvas.width / videoRatio;
+                drawX = 0;
+                drawY = (canvas.height - drawH) / 2;
+            }
+
+            ctx.save();
+            if(currentFacingMode === 'user') {
+                // CORRECTION ICI: 
+                // On translate à droite, on inverse l'axe X.
+                // Ensuite on dessine avec les coordonnées POSITIVES.
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, drawX, drawY, drawW, drawH);
+            } else {
+                ctx.drawImage(video, drawX, drawY, drawW, drawH);
+            }
+            ctx.restore();
+
+            // 2. Dessiner les overlays
+            const txtWrap = document.getElementById('text3DWrapper');
+            if (!txtWrap.classList.contains('hidden')) {
+                const w = txtWrap.getBoundingClientRect();
+                ctx.drawImage(renderer.domElement, (w.left - rect.left) * sx, (w.top - rect.top) * sy, w.width * sx, w.height * sy);
+            }
+            const imgWrap = document.getElementById('templateWrapper');
+            if (!imgWrap.classList.contains('hidden')) {
+                const w = imgWrap.getBoundingClientRect();
+                ctx.drawImage(document.getElementById('templateOverlay'), (w.left - rect.left) * sx, (w.top - rect.top) * sy, w.width * sx, w.height * sy);
+            }
+
+            const url = canvas.toDataURL('image/png');
+            document.getElementById('resultArea').classList.remove('hidden');
+            document.getElementById('gallery').innerHTML = `
+                <div class="p-2 bg-slate-800 text-xs text-center text-slate-400">Photo générée (${canvas.width}x${Math.round(canvas.height)})</div>
+                <img src="${url}" class="w-full">
+                <a href="${url}" download="photomaton_${currentFormat}.png" class="block bg-green-600 text-center py-4 font-bold uppercase tracking-widest active:bg-green-700">Enregistrer l'image</a>
+            `;
+            document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function loadTemplate(src) {
+            const wrap = document.getElementById('templateWrapper');
+            const img = document.getElementById('templateOverlay');
+            img.src = src;
+            img.onload = () => { wrap.classList.remove('hidden'); selectElement(wrap); };
+        }
+
+        function initLibrary() {
+            const grid = document.getElementById('libraryGrid');
+            libraryImages.forEach(src => {
+                const item = document.createElement('div');
+                item.className = 'library-item';
+                item.innerHTML = `<img src="${src}" class="w-full h-full object-contain pointer-events-none">`;
+                item.onclick = () => loadTemplate(src);
+                grid.appendChild(item);
+            });
+        }
+
+        document.getElementById('btnCapture').onclick = () => {
+            const count = document.getElementById('countdown');
+            let c = 3; count.classList.remove('hidden'); count.textContent = c;
+            const itv = setInterval(() => {
+                c--;
+                if(c<=0) { 
+                    clearInterval(itv); 
+                    count.classList.add('hidden'); 
+                    document.getElementById('flashOverlay').classList.add('animate-flash');
+                    setTimeout(() => {
+                        doCapture();
+                        document.getElementById('flashOverlay').classList.remove('animate-flash');
+                    }, 100);
+                } else count.textContent = c;
+            }, 700);
+        };
+
+        document.getElementById('text3DInput').oninput = updateText3D;
+        document.getElementById('btnSwitchCam').onclick = () => { 
+            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user'; 
+            initCam(); 
+        };
+        document.getElementById('btnToggleFormat').onclick = toggleFormat;
+        
+        window.onload = () => {
+            initLibrary(); 
+            initCam(); 
+            init3D();
+            makeManipulable(document.getElementById('templateWrapper'));
+            makeManipulable(document.getElementById('text3DWrapper'));
+        };
+    </script>
+</body>
+</html>
